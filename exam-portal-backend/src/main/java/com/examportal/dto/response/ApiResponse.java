@@ -1,4 +1,4 @@
 package com.examportal.dto.response;
 
-public class ApiResponse {
+public class ApiResponse<S> {
 }
