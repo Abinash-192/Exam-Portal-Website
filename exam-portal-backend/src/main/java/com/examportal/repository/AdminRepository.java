@@ -3,20 +3,48 @@ package com.examportal.repository;
 import com.examportal.model.Role;
 import com.examportal.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Repository
 public interface AdminRepository extends JpaRepository<User,Long> {
 
     List<User> findByRole(Role role);
 
     Optional<User> findByEmailAndRole(String email , Role role);
 
+    @Query("SELECT u from User u " +
+            "WHERE u.createdAt >= :since " +
+            "AND u.role = 'USER' "+
+            "ORDER BY u.createdAt DESC")
     List<User> findRecentlyRegistered(LocalDateTime since);
 
+    @Query("SELECT COUNT(u) FROM User u "+
+            "WHERE u.approved = false "+
+            "AND u.blocked = false "+ "AND u.emailVerified = true " +
+            "AND u.role = 'USER' ")
     long countPendingApprovals();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role = :role ")
     long countByRole(Role role);
+
+    @Query("SELECT COUNT(u) FROM User u "+
+            "WHERE u.blocked = true AND u.role = 'USER' ")
     long countBlockedUsers();
+
+    @Query(value = "SELECT DATE(created_At) as reg_date , COUNT(*) as count "
+            + "FROM users "+ "WHERE created_at >= DATE_SUB(NOW(), " +
+            "INTERVAL 7 DAY) "+ "AND role = 'USER' "+ "GROUP BY DATE(created_at) "+
+            "ORDER BY reg_date ASC" , nativeQuery = true)
+    List<Object[]> getRegistrationCountLast7Days();
+
+    @Query("SELECT u FROM User u "+
+            "WHERE u.role = 'USER' " +
+            "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<User> searchUsers(String keyword);
 }
