@@ -1,6 +1,7 @@
 package com.examportal.service;
 
 import com.examportal.dto.response.UserResponse;
+import com.examportal.dto.response.UserStatsResponse;
 import com.examportal.model.Role;
 import com.examportal.repository.AdminActionRepository;
 import com.examportal.repository.AdminRepository;
@@ -73,5 +74,10 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    
+    public UserStatsResponse getUserStats(Long userId){
+
+        
+    }
+
+
 }
