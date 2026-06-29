@@ -4,6 +4,7 @@ import com.examportal.dto.response.AttemptResultResponse;
 import com.examportal.dto.response.UserResponse;
 import com.examportal.dto.response.UserStatsResponse;
 import com.examportal.exception.ValidationException;
+import com.examportal.model.AdminAction.ActionType;
 import com.examportal.model.Role;
 import com.examportal.model.User;
 import com.examportal.repository.AdminActionRepository;
@@ -11,18 +12,22 @@ import com.examportal.repository.AdminRepository;
 import com.examportal.repository.ExamRepository;
 import com.examportal.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
     private final UserRepository  userRepository;
     private final AdminRepository adminRepository;
     private final AdminActionRepository actionRepository;
@@ -142,13 +147,103 @@ public class AdminService {
          User user = findUserOrThrow(id);
          User admin = getCurrentAdmin();
 
-         if(user.isApproved())
-             throw new ValidationException("User ["+ user.getEmail() + "] is already approved.");
-
+         if(user.isApproved()) {
+             throw new ValidationException("User [" + user.getEmail() + "] is already approved.");
+         }
          if (user.isBlocked()) {
              throw new ValidationException("Cannot approved a blocked user. Unblock first.");
          }
+
+         if (!user.isEmailVerified()) {
+             throw  new ValidationException("Cannot approve a user whose email is not yet verified.");
+         }
+
+         user.setApproved(true);
+         user.setEnabled(true);
+         userRepository.save(user);
+
+         logAction(admin,user, ActionType.APPROVE_USER,reason != null ? reason : "Approved by Admin");
+
+         broadcastAdminEvent("USER_APPROVED", Map.of("userId", user.getId(),
+                 "userName", user.getName() ,
+                 "email" , user.getEmail()));
+
+         emailService.sendApprovalEmail(user.getEmail() , user.getName());
+         log.info("Admin [{}] approved user [{}]" , admin.getEmail(),user.getEmail());
+         return  userService.mapToResponse(user);
      }
 
+     @Transactional
+     public UserResponse blockUser(Long id, String reason){
+
+        User user = findUserOrThrow(id);
+        User admin = getCurrentAdmin();
+
+         if (user.getRole() == Role.ADMIN) {
+             throw  new ValidationException("Admin Accounts can't be blocked.");
+         }
+
+         if (user.isBlocked()) {
+             throw  new ValidationException("User [" + user.getEmail() + "] is already blocked.");
+         }
+
+         user.setBlocked(true);
+         user.setEnabled(false);
+         userRepository.save(user);
+
+         logAction(admin, user, ActionType.BLOCK_USER, reason != null ? reason : "Blocked by Admin");
+         broadcastAdminEvent("USER BLOCKED", Map.of("UserId", user.getId(),
+                 "userName", user.getName(),
+                 "email", user.getEmail()));
+
+         emailService.sendBlockedEmail(user.getEmail() , user.getName());
+         log.info("Admin [{}] blocked user [{}] ", admin.getEmail(), user.getEmail());
+         return userService.mapToResponse(user);
+     }
+
+     @Transactional
+     public UserResponse unBlockUser(Long id, String reason){
+        User user = findUserOrThrow(id);
+        User admin = getCurrentAdmin();
+
+         if (!user.isBlocked()) {
+            throw new ValidationException("User ["+ user.getEmail() +"] is not blocked.");
+         }
+
+         user.setBlocked(false);
+         user.setEnabled(true);
+         userRepository.save(user);
+
+         logAction(admin, user, ActionType.UNBLOCK_USER, reason != null ? reason : "Unblocked by admin");
+         broadCastAdminEvent("USER_UNBLOCKED", Map.of(
+                 "userId", user.getId(),"userName",
+                 user.getName(),
+                 "email", user.getEmail()));
+
+         emailService.sendUnblockedEmail(user.getEmail(), user.getName());
+         log.info("Admin [{}] unblocked user [{}] ", admin.getEmail(),user.getEmail());
+         return userService.mapToResponse(user);
+     }
+
+     @Transactional
+     public void deleteUser(Long id, String reason){
+
+        User user = findUserOrThrow(id);
+        User admin = getCurrentAdmin();
+
+         if (user.getRole() == Role.ADMIN) {
+             throw new ValidationException("Admin accounts cannot be deleted.");
+         }
+
+         logAction(admin, user, ActionType.DELETE_USER, reason != null ? reason : "Deleted by admin");
+         userRepository.delete(user);
+         broadcastAdminEvent("USER_DELETED" , Map.of(
+                 "userId", user.getId(),
+                 "userName", user.getName(),
+                 "email", user.getEmail()));
+         log.info("Admin [{}] deleted user [{}] ", admin.getEmail(),user.getEmail());
+     }
+
+     
 
 }
