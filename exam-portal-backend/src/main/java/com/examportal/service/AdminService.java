@@ -271,6 +271,7 @@ public class AdminService {
 
      }
 
+     @Transactional(readOnly = true)
      public List<AttemptResultResponse> getExamResults(Long examId){
 
          if (!examRepository.existsById()) {
@@ -280,12 +281,21 @@ public class AdminService {
          return attemptRepository.findByExamIdOrderByAttemptedAtDesc(examId)
                  .stream()
                  .map(a -> AttemptResultResponse.builder()
-                         .attemptId(a.getId))
+                         .attemptId(a.getId())
                          .examTitle(a.getExam().getTitle())
                          .category(a.getExam().getCategory())
                          .scoreObtained(a.getScoreObtained())
                          .totalMarks(a.getTotalMarks())
                          .percentage(a.getPercentage())
+                         .passed(a.isPssed())
+                         .correctAnsers(a.getCorrectAnswers())
+                         .wrongAnsers(a.getWrongAnsers())
+                         .unanswered(a.getUnanswered())
+                         .timeTakenSeconds(a.getgetTimeTakenSecons())
+                         .performanceBand(computePerformanceBand(a.getPercentage()))
+                         .attemptedAt(a.getAttemptedAt()).build())
+                 .collect(Collectors.toList());
+
 
      }
 
