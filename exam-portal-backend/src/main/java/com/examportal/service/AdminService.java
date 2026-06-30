@@ -1,8 +1,10 @@
 package com.examportal.service;
 
+import com.examportal.dto.request.AdminUpdateUserRequest;
 import com.examportal.dto.response.AttemptResultResponse;
 import com.examportal.dto.response.UserResponse;
 import com.examportal.dto.response.UserStatsResponse;
+import com.examportal.exception.ResourceNotFoundException;
 import com.examportal.exception.ValidationException;
 import com.examportal.model.AdminAction.ActionType;
 import com.examportal.model.Role;
@@ -244,6 +246,47 @@ public class AdminService {
          log.info("Admin [{}] deleted user [{}] ", admin.getEmail(),user.getEmail());
      }
 
-     
+     @Transactional
+     public UserResponse updateUser(Long id, AdminUpdateUserRequest req){
+
+        User user = findUserOrThrow(id);
+         if (req.getName() != null) {
+             user.setName(req.getName());
+         }
+         if (req.getMobile() != null) {
+             user.setMobile(req.getMobile());
+         }
+         if (req.getRole() != null) {
+
+             try {
+                 user.setRole(Role.valueOf(req.getRole().toUpperCase()));
+             }catch (IllegalArgumentException e){
+                 throw  new ValidationException("Invalid Role : " + req.getRole() + ". use USER or ADMIN.");
+             }
+         }
+
+         userRepository.save(user);
+         log.info("Admin updated user [{}] ", user.getEmail());
+         return  userService.mapToResponse(user);
+
+     }
+
+     public List<AttemptResultResponse> getExamResults(Long examId){
+
+         if (!examRepository.existsById()) {
+
+             throw new ResourceNotFoundException("Exam not found : " + examId);
+         }
+         return attemptRepository.findByExamIdOrderByAttemptedAtDesc(examId)
+                 .stream()
+                 .map(a -> AttemptResultResponse.builder()
+                         .attemptId(a.getId))
+                         .examTitle(a.getExam().getTitle())
+                         .category(a.getExam().getCategory())
+                         .scoreObtained(a.getScoreObtained())
+                         .totalMarks(a.getTotalMarks())
+                         .percentage(a.getPercentage())
+
+     }
 
 }
