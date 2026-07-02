@@ -1,39 +1,37 @@
 package com.examportal.service;
 
 import com.examportal.dto.request.AdminUpdateUserRequest;
-import com.examportal.dto.response.AttemptResultResponse;
-import com.examportal.dto.response.UserResponse;
-import com.examportal.dto.response.UserStatsResponse;
+import com.examportal.dto.response.*;
 import com.examportal.exception.ResourceNotFoundException;
 import com.examportal.exception.ValidationException;
+import com.examportal.model.AdminAction;
 import com.examportal.model.AdminAction.ActionType;
 import com.examportal.model.Role;
 import com.examportal.model.User;
-import com.examportal.repository.AdminActionRepository;
-import com.examportal.repository.AdminRepository;
-import com.examportal.repository.ExamRepository;
-import com.examportal.repository.UserRepository;
+import com.examportal.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminService {
 
-    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+
     private final UserRepository  userRepository;
     private final AdminRepository adminRepository;
     private final AdminActionRepository actionRepository;
     private final ExamRepository examRepository;
+    private final ExamAttemptRepository attemptRepository;
     private final UserService  userService;
     private final EmailService  emailService;
     private final SimpMessagingTemplate ws;
@@ -72,7 +70,7 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> getUserById(Long id){
+    public UserResponse getUserById(Long id){
 
         return userService.mapToResponse(findUserOrThrow(id));
     }
@@ -97,7 +95,7 @@ public class AdminService {
         Double avgPct = attemptRepository.avgPercentageByUserId(userId);
 
         LocalDateTime lastExam = attemptRepository
-                .findByUserIdOderByAttemptedAtDesc(userId)
+                .findByUserIdOrderByAttemptedAtDesc(userId)
                 .stream()
                 .findFirst()
                 .map(a -> a.getAttemptedAt())
@@ -137,7 +135,7 @@ public class AdminService {
                   .totalExamsFailed(totalFailed)
                   .averageScore(avgScore != null ? Math.round(avgScore * 10.0) / 10.0 : 0.0)
                   .averagePercentage(avgPct != null ? Math.round(avgPct * 10.0) / 10.0 : 0.0)
-                  .bestPerformanceBand(computerPerformanceBand(avgPct != null ? avgPct : 0.0))
+                  .bestPerformanceBand(computePerformanceBand(avgPct != null ? avgPct : 0.0))
                   .joinedAt(user.getCreatedAt())
                   .lastExamDate(lastExam)
                   .examHistory(history)
@@ -296,7 +294,155 @@ public class AdminService {
                          .attemptedAt(a.getAttemptedAt()).build())
                  .collect(Collectors.toList());
 
+     }
 
+     @Transactional(readOnly = true)
+     public List<AttemptResultResponse> getUserResults(Long userId){
+         findUserOrThrow(userId);
+
+         return attemptRepository
+                 .findByUserIdOrderByAttemptedAtDesc(userId0)
+                 .stream()
+                 .map(a -> AttemptResultResponse.builder()
+                         .attemptId(a.getId())
+                         .examTitle(a.getExam().getTitle())
+                         .category(a.getExam().getCategory())
+                         .scoreObtained(a.getScoreObtained())
+                         .totalMarks(a.getTotalMarks())
+                         .percentage(a.getPercentage())
+                         .passed(a.isPassed())
+                         .correctAnswers(a.getCorrectAnswers())
+                         .wrongAnswers(a.getWrongAnswers())
+                         .performanceBand(computePerformanceBand(a.getPercentage()))
+                         .attemptedAt(a.getAttemptedAt())
+                         .build())
+                         .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<AdminActivityResponse> getRecentActivity(){
+
+         return actionRepository.findByTop20ByOrderByPerformedAtDesc()
+                 .stream().map(this::mapToActivityResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<AdminActivityResponse> getActivityByAdmin(Long adminId){
+
+         return actionRepository
+                 .findByAdminIdOrderByPerformedAtDesc(adminId)
+                 .stream()
+                 .map(this::mapToActivityResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<AdminActivityResponse> getActivityByDateRange(LocalDateTime from, LocalDateTime to){
+
+         return actionRepository.findByDateRange(from, to)
+                 .stream()
+                 .map(this::mapToActivityResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public AdminDashboardResponse getDashboardStats(){
+
+         Long totalUsers  = adminRepository.countByRole(Role.USER);
+         Long totalAdmins = adminRepository.countByRole(Role.ADMIN);
+         Long pendingApprovals = adminRepository.countPendingApprovals();
+         Long blockedUsers = adminRepository.countBlockedUsers();
+         Long approvedUsers = adminRepository.countApprovedUsers();
+         Long totalExams  = adminRepository.count();
+         Long activeExams = attemptRepository.countTotalAttempts();
+         Long totalAttempts = attemptRepository.countTotalAttempts();
+         Double passRate = attemptRepository.getOverallPassRate();
+
+         List<Object[]> rawReg = adminRepository.getRegistrationCountLast7Days();
+         Map<String,Long> regChart = new LinkedHashMap<>();
+         rawReg.forEach(row -> regChart.put(row[0].toString(), ((Number) row[1]).longValue()));
+
+         List<AdminActivityResponse> recentActivity  = getRecentActivity();
+         return AdminDashboardResponse.builder()
+                 .totalUsers(totalUsers)
+                 .totalAdmins(totalAdmins)
+                 .pendingApprovals(pendingApprovals)
+                 .blockedUsers(blockedUsers)
+                 .approvedUsers(approvedUsers)
+                 .totalExams(totalExams)
+                 .totalActiveExams(activeExams)
+                 .totalAttempts(totalAttempts)
+                 .overallPassRate(passRate != null ? Math.round(passRate * 10.0) / 10.0 : 0.0)
+                 .registrationsLast7Days(regChart)
+                 .recentActivity(recentActivity)
+                 .build();
+     }
+
+     private User findUserOrThrow(Long id){
+
+         return userRepository.findById(id)
+                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id : "+ id));
+     }
+
+     private User getCurrentAdmin() {
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Amin not found : "+ email));
+     }
+
+     private void logAction(User admin, User target,ActionType type, String description){
+
+         AdminAction action  = AdminAction.builder()
+                 .admin(admin)
+                 .targetUser(target)
+                 .actionType(type)
+                 .description(description)
+                 .build();
+         actionRepository.save(action);
+     }
+
+     private AdminActivityResponse mapToActivityResponse(AdminAction a){
+
+         return AdminActivityResponse.builder()
+                 .id(a.getId())
+                 .adminName(a.getAdmin().getName())
+                 .adminEmail(a.getAdmin().getEmail())
+                 .actionType(a.getActionType().name())
+                 .targetUserName(a.getTargetUser() != null ? a.getTargetUser().getName() : null)
+                 .targetUserEmail(a.getTargetUser() != null ? a.getTargetUser().getEmail() : null)
+                 .description(a.getDescription())
+                 .performedAt(a.getPerformedAt())
+                 .build();
+     }
+
+     private String computePerformanceBand(double pct){
+
+         if (pct >= 90) {
+             return  "Excellent";
+         }
+         if (pct >= 75) {
+             return "Good";
+         }
+         if (pct >= 50) {
+             return "Average";
+         }
+         return  "Below Average";
+     }
+
+     private void broadcastAdminEvent(String event, Map<String,Object> payload){
+
+         try {
+             Map<String, Object> msg = new HashMap<>(payload);
+             msg.put("event" , event);
+             msg.put("timeStamp" , LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
+//             ws.convertAndSend("/topic/admin/activity" , msg);
+             ws.convertAndSend("/topic/admin/activity", (Object) msg);
+         } catch (Exception e) {
+             log.warn("Failed to broadcast admin ws event [{}] : {}", event , e.getMessage());
+         }
      }
 
 }

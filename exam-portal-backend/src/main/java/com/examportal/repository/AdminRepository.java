@@ -25,7 +25,8 @@ public interface AdminRepository extends JpaRepository<User,Long> {
 
     @Query("SELECT COUNT(u) FROM User u "+
             "WHERE u.approved = false "+
-            "AND u.blocked = false "+ "AND u.emailVerified = true " +
+            "AND u.blocked = false "+
+            "AND u.emailVerified = true " +
             "AND u.role = 'USER' ")
     long countPendingApprovals();
 
@@ -35,6 +36,9 @@ public interface AdminRepository extends JpaRepository<User,Long> {
     @Query("SELECT COUNT(u) FROM User u "+
             "WHERE u.blocked = true AND u.role = 'USER' ")
     long countBlockedUsers();
+
+    @Query("SELECT COUNT(u) FROM User u "+ "WHERE u.approved = true AND U.role = 'USER'")
+    long countApprovedUsers();
 
     @Query(value = "SELECT DATE(created_At) as reg_date , COUNT(*) as count "
             + "FROM users "+ "WHERE created_at >= DATE_SUB(NOW(), " +
