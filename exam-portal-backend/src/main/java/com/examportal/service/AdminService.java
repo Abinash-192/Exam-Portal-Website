@@ -142,6 +142,7 @@ public class AdminService {
                   .build();
     }
 
+    @Transactional
      public UserResponse approveUser(Long id ,String reason){
 
          User user = findUserOrThrow(id);
