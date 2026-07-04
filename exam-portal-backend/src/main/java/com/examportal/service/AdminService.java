@@ -32,6 +32,7 @@ public class AdminService {
     private final AdminActionRepository actionRepository;
     private final ExamRepository examRepository;
     private final ExamAttemptRepository attemptRepository;
+    private final AttemptAnswerRepository answerRepository;
     private final UserService  userService;
     private final EmailService  emailService;
     private final SimpMessagingTemplate ws;

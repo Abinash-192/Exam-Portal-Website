@@ -18,6 +18,7 @@ public class UserStatsResponse {
     private String mobile;
     private String role;
     private String provider;
+    private String profilePicture;
 
     private boolean approved;
     private boolean blocked;
@@ -31,6 +32,7 @@ public class UserStatsResponse {
     private String bestPerformanceBand;
 
     private LocalDateTime joinedAt;
+    private LocalDateTime lastLoginAt;
     private LocalDateTime lastExamDate;
 
     private List<AttemptResultResponse> examHistory;
