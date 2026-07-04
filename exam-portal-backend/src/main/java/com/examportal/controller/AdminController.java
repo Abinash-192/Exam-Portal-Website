@@ -502,9 +502,6 @@ public class AdminController {
                   adminService.getActivityByDateRange(from, to));
      }
 
-     // ═════════════════════════════════════════════════════════════
-     // CONVENIENCE
-     // ═════════════════════════════════════════════════════════════
 
      private <T> ResponseEntity<ApiResponse<T>> ok(String msg, T data) {
           return ResponseEntity.ok(ApiResponse.success(msg, data));
