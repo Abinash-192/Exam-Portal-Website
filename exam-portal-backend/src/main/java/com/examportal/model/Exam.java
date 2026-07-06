@@ -86,7 +86,7 @@ public class Exam {
             fetch = FetchType.LAZY)
     @Builder.Default
     private List<ExamAttempt> attempts = new ArrayList<>();
-    
+
     public enum DifficultyLevel{
         EASY,MEDIUM,HARD
     }
