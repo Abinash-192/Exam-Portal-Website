@@ -31,7 +31,7 @@ public class ExamRequest {
     private int totalMarks;
 
     @Min(value = 1, message = "passing marks must be at least 10")
-    private String passingMarks;
+    private int passingMarks;
 
     @NotBlank(message = "Difficulty is required(easy/medium/hard)")
     private String difficulty;
