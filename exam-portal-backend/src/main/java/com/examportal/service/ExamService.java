@@ -30,7 +30,7 @@ public class ExamService {
                                 req.getTotalMarks());
          if (examRepository.existsByTitleIgnoreCase(req.getTitle())) {
 
-             throw new ValidationException("An exam with title [" + req.getTitle() +"] already exists.")
+             throw new ValidationException("An exam with title [" + req.getTitle() +"] already exists.");
          }
 
          Exam exam = Exam.builder()
@@ -48,7 +48,7 @@ public class ExamService {
 
          Exam saved = examRepository.save(exam);
          if (req.getQuestions() != null && !req.getQuestions().isEmpty()) {
-             req.getQuestions().forEach(q -> questionService.addQuestion(saved.getId(), q);
+             req.getQuestions().forEach(q -> questionService.addQuestion(saved.getId(), q));
          }
 
          logAdminAction(AdminAction.ActionType.CREATE_EXAM,"Created exam : "+ saved.getTitle());
