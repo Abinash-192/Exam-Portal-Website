@@ -2,8 +2,9 @@ package com.examportal.service;
 
 import com.examportal.dto.request.ExamRequest;
 import com.examportal.dto.response.ExamResponse;
+import com.examportal.dto.response.ExamSummaryResponse;
 import com.examportal.exception.ValidationException;
-import com.examportal.model.AdminAction;
+import com.examportal.model.AdminAction.ActionType;
 import com.examportal.model.Exam;
 import com.examportal.repository.AdminActionRepository;
 import com.examportal.repository.ExamAttemptRepository;
@@ -12,6 +13,10 @@ import com.examportal.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class ExamService {
@@ -24,7 +29,8 @@ public class ExamService {
      private final AdminActionRepository actionRepository;
 
 
-     private ExamResponse createExam(ExamRequest req){
+     @Transactional
+     public ExamResponse createExam(ExamRequest req){
 
          validatePassingMarks(req.getPassingMarks(),
                                 req.getTotalMarks());
@@ -51,9 +57,86 @@ public class ExamService {
              req.getQuestions().forEach(q -> questionService.addQuestion(saved.getId(), q));
          }
 
-         logAdminAction(AdminAction.ActionType.CREATE_EXAM,"Created exam : "+ saved.getTitle());
+         logAdminAction(ActionType.CREATE_EXAM,"Created exam : "+ saved.getTitle());
          log.info("Exam created :"+ saved.getTitle());
          log.info("Exam created : [{}] id = [{}]",saved.getTitle(),saved.getId());
          return mapToFullResponse(examRepository.findById(saved.getId()).orElse(saved),true,true);
+     }
+
+     @Transactional
+     public ExamResponse updateExam(Long id, ExamRequest req){
+
+         Exam exam = findOrThrow(id);
+         validatePassingMarks(req.getPassingMarks(),
+                 req.getTotalMarks());
+         if (examRepository.existsByTitleIgnoreCaseAndIdNot(req.getTitle(),id)) {
+             throw  new ValidatioonException("Another exam with title ["+ req.getTitle() +"] already exists.");
+         }
+
+         exam.setTitle(req.getTitle().trim());
+         exam.setDescription(req.getDescription());
+         exam.setCategory(req.getCategory().trim());
+         exam.setDurationMintues(req.getDurationMintues());
+         exam.setTotalMarks(req.getTotalMarks());
+         exam.setPassingMarks(req.getPassingMarks());
+         exam.setDifficulty(parseDifficulty(req.getDifficulty()));
+         exam.setActive(req.isActive());
+         exam.setInstructions(req.getInstructions());
+         exam.setThumbnailUrl(req.getThumbnailUrl());
+         exam.setTags(req.getTags());
+
+         Exam updated = examRepository.save(exam);
+         logAdminAction(ActionType.UPDATE_EXAM,"Updated exam :"+updated.getTitle());
+         log.info("Exam updated : [{}] id = [{}]",updated.getId());
+         return mapToFullResponse(updated,true,true);
+     }
+
+     @Transactional
+     public void deleteExam(Long id){
+
+         Exam exam = findOrThrow(id);
+         logAdminAction(ActionType.DELETE_EXAM,
+                 "Deleted exam : "+exam.getTitle());
+         examRepository.delete(exam);
+         log.info("Exam deleted :[{}] id = [{]]",exam.getTitle(),id);
+     }
+
+     @Transactional
+     public ExamSummaryResponse toggleStatus(Long id){
+         Exam exam = findOrThrow(id);
+         exam.setActive(!exam.isActive());
+         Exam  saved = examRepository.save(exam);
+
+         logAdminAction(ActionType.TOGGLE_EXAM,"Toggled exam [" + saved.getTitle() + "] -> active = "+ saved.isActive());
+         log.info("Exam [{}] toggled -> active ={}",saved.getTitle(),saved.isActive());
+
+         return mapToSummaryResponse(saved);
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamSummaryResponse> getAllActiveExams(){
+         return examRepository.findByActiveTrueOrderByCreatedAtDesc()
+                 .stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamSummaryResponse> getActiveByCategory(String category){
+
+         return examRepository.findByCategoryAndActiveTrueOrderByCreatedAtDesc(category)
+                 .stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamSummaryResponse> getActiveByDifficulty(String difficulty){
+
+
+         return examRepository.findByDifficultyAndActiveTrueOrderByCreatedAtDesc(parseDifficulty(difficulty))
+                 .stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
      }
 }
