@@ -1,6 +1,8 @@
 package com.examportal.service;
 
+import com.examportal.dto.request.ExamFilterRequest;
 import com.examportal.dto.request.ExamRequest;
+import com.examportal.dto.response.ExamDetailResponse;
 import com.examportal.dto.response.ExamResponse;
 import com.examportal.dto.response.ExamSummaryResponse;
 import com.examportal.exception.ValidationException;
@@ -138,5 +140,82 @@ public class ExamService {
                  .stream()
                  .map(this::mapToSummaryResponse)
                  .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamSummaryResponse>  searchActiveExams(String keyword){
+
+         return examRepository
+                 .searchActiveExams(keyword)
+                 .stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
+
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamSummaryResponse>  filterExams(ExamFilterRequest filter){
+
+         List<Exam> exams;
+         boolean activeOnly  = filter.getActiveOnly() == null || filter.getActiveOnly();
+
+         if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
+
+             exams = activeOnly ? examRepository.searchActiveExams(filter.getKeyword()) : examRepository.searchAllExams(filter.getKeyword());
+         } else if (filter.getCategory() != null && filter.getDifficulty() != null) {
+
+             exams = examRepository.findByCategoryAndDifficultyAndActive(filter.getCategory(),parseDifficulty(filter.getDifficulty()));
+         } else if (filter.getDifficulty() != null) {
+
+             exams = examRepository.findByDifficultyAndActiveTrueOrderByCreatedAtDesc(parseDifficulty(filter.getDifficulty()));
+         } else if (filter.getDifficulty() != null) {
+
+             exams = examRepository.findByDifficultyAndActiveTrueOrderByCreatedAtDesc(parseDifficulty(filter.getDifficulty()));
+         }
+         else{
+
+             exams = examRepository.findByActiveTrueOrderByCreatedAtDesc();
+         }
+
+         return exams.stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public ExamDetailResponse getExamForUser(Long id){
+
+         Exam exam = findOrThrow(id);
+         if (!exam.isActive()) {
+
+             throw new ValidationException("This exam is not currently available.");
+         }
+         return mapToDetailResponse(exam);
+     }
+
+     @Transactional(readOnly = true)
+     public List<String>  getActiveCategories(){
+         return examRepository.findDistinctActiveCategories();
+     }
+
+     @Transactional(readOnly = true)
+     public List<ExamResponse>  getAllExamsAdmin(){
+
+         return  examRepository.findAllByOrderByCreatedAtDesc()
+                 .stream()
+                 .map(e -> mapToFullResponse(e,false,true))
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public ExamResponse getExamForAdmin(Long id){
+
+         return mapToFullResponse(findOrThrow(id),true,true);
+     }
+
+     @Transactional(readOnly = true)
+     public List<String> getAllCategories(){
+
+         return examRepository.findAllDistinctActiveCategories();
      }
 }
