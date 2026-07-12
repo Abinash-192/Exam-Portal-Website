@@ -37,4 +37,16 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
 
     @Query("SELECT a FROM ExamAttempt a "+ "WHERE a.resultEmailSent = false "+ "AND a.status = 'COMPLETED'")
     List<ExamAttempt> findPendingEmailDispatch();
+
+    @Query("SELECT AVG(a.percentage) FROM ExamAttempt a " +
+            "WHERE a.exam.id = :examId")
+    Double avgPercentageByExamId(Long examId);
+
+    @Query("SELECT MAX(a.scoreObtained) FROM ExamAttempt a " +
+            "WHERE a.exam.id = :examId")
+    Double maxScoreByExamId(Long examId);
+
+    @Query("SELECT MIN(a.scoreObtained) FROM ExamAttempt a " +
+            "WHERE a.exam.id = :examId")
+    Double minScoreByExamId(Long examId);
 }

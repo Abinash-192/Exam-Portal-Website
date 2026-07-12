@@ -4,6 +4,7 @@ import com.examportal.dto.request.ExamFilterRequest;
 import com.examportal.dto.request.ExamRequest;
 import com.examportal.dto.response.ExamDetailResponse;
 import com.examportal.dto.response.ExamResponse;
+import com.examportal.dto.response.ExamStatsResponse;
 import com.examportal.dto.response.ExamSummaryResponse;
 import com.examportal.exception.ValidationException;
 import com.examportal.model.AdminAction.ActionType;
@@ -217,5 +218,16 @@ public class ExamService {
      public List<String> getAllCategories(){
 
          return examRepository.findAllDistinctActiveCategories();
+     }
+
+     public ExamStatsResponse getExamStats(Long id){
+         Exam exam = findOrThrow(id);
+
+         long  totalAttempts = attemptRepository.countByExamId(id);
+         long  totalPassed  = attemptRepository.countPassedByExamId(id);
+         long totalFailed = totalAttempts - totalPassed;
+         Double avgScore = attemptRepository.avgScoreByExamId(id);
+         Double avgPct = attemptRepository.avgPercentageByExamId(id);
+         Double  highestScore = attemptRepository.maxScoreByExamId(id);
      }
 }
