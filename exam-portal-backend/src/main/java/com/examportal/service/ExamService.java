@@ -6,6 +6,7 @@ import com.examportal.dto.response.ExamDetailResponse;
 import com.examportal.dto.response.ExamResponse;
 import com.examportal.dto.response.ExamStatsResponse;
 import com.examportal.dto.response.ExamSummaryResponse;
+import com.examportal.exception.ResourceNotFoundException;
 import com.examportal.exception.ValidationException;
 import com.examportal.model.AdminAction.ActionType;
 import com.examportal.model.Exam;
@@ -16,6 +17,7 @@ import com.examportal.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -73,7 +75,7 @@ public class ExamService {
          validatePassingMarks(req.getPassingMarks(),
                  req.getTotalMarks());
          if (examRepository.existsByTitleIgnoreCaseAndIdNot(req.getTitle(),id)) {
-             throw  new ValidatioonException("Another exam with title ["+ req.getTitle() +"] already exists.");
+             throw  new ValidationException("Another exam with title ["+ req.getTitle() +"] already exists.");
          }
 
          exam.setTitle(req.getTitle().trim());
@@ -228,6 +230,168 @@ public class ExamService {
          long totalFailed = totalAttempts - totalPassed;
          Double avgScore = attemptRepository.avgScoreByExamId(id);
          Double avgPct = attemptRepository.avgPercentageByExamId(id);
-         Double  highestScore = attemptRepository.maxScoreByExamId(id);
+         Integer  highestScore = attemptRepository.maxScoreByExamId(id);
+         Integer  lowestScore = attemptRepository.minScoreByExamId(id);
+
+         double passRate  = totalAttempts > 0 ? Math.round(totalPassed * 100.0 / totalAttempts * 10) / 10.0 : 0.0;
+         return ExamStatsResponse.builder()
+                 .examId(exam.getId())
+                 .examTitle(exam.getTitle())
+                 .category(exam.getCategory())
+                 .difficulty(exam.getDifficulty().name())
+                 .totalAttempts(totalAttempts)
+                 .totalPassed(totalPassed)
+                 .totalFailed(totalFailed)
+                 .passRate(passRate)
+                 .totalMarks(exam.getTotalMarks())
+                 .passingMarks(exam.getPassingMarks())
+                 .avgScore(round(avgScore))
+                 .avgPercentage(round(avgPct))
+                 .highestScore(highestScore != null ? highestScore : 0)
+                 .lowestScore(lowestScore != null ? lowestScore : 0)
+                 .build();
+     }
+
+     public long countActiveExams(){
+         return examRepository.countActiveExams();
+     }
+
+     public long countAllExams(){
+         return examRepository.count();
+     }
+
+     public ExamResponse mapToFullResponse(Exam exam, boolean includeQuestions,boolean includeStats){
+
+         ExamResponse.ExamResponseBuilder builder = ExamResponse.builder()
+                 .id(exam.getId())
+                 .title(exam.getTitle())
+                 .description(exam.getDescription())
+                 .category(exam.getCategory())
+                 .difficulty(exam.getDifficulty().name())
+                 .active(exam.isActive())
+                 .instructions(exam.getInstructions())
+                 .thumbnail(exam.getThumbnailUrl())
+                 .tags(exam.getTags())
+                 .durationMintues(exam.getDurationMintues())
+                 .totalMarks(exam.getTotalMarks())
+                 .passingMarks(exam.getPassingMarks())
+                 .questionCount(exam.getQuestions() != null ? exam.getQuestions().size() : 0)
+                 .createdAt(exam.getCreatedAt())
+                 .updatedAt(exam.getUpdatedAt());
+
+         if (includeStats) {
+
+             Long totalAttempts = attemptRepository.countByExamId(exam.getId());
+             Long totalPassed = attemptRepository.countPassedByExamId(exam.getId());
+             Double avgScore = attemptRepository.avgScoreByExamId(exam.getId());
+             Double avgPct = attemptRepository.avgPercentageByExamId(exam.getId());
+             double passRate = totalAttempts != null && totalAttempts > 0 ? Math.round(totalPassed * 100.0 / totalAttempts * 10) / 10.0 : 0.0;
+             builder.totalAttempts(totalAttempts)
+                     .totalPassed(totalPassed)
+                     .avgscore(round(avgScore))
+                     .avgPecentage(round(avgPct))
+                     .passRate(passRate);
+         }
+
+         if (includeQuestions && exam.getQuestions() != null) {
+
+             builder.questions(exam.getQuestions().stream().map(q -> questionService.mapToResponse(q,includeStats)).collect(Collectors.toList()));
+         }
+         return builder.build();
+     }
+
+     public ExamSummaryResponse mapToSummaryResponse(Exam exam){
+
+         return  ExamSummaryResponse.builder()
+                 .id(exam.getId())
+                 .title(exam.getTitle())
+                 .description(exam.getDescription())
+                 .category(exam.getCategory())
+                 .difficulty(exam.getDifficulty().name())
+                 .active(exam.isActive())
+                 .thumbnailUrl(exam.getThumbnailUrl())
+                 .tags(exam.getTags())
+                 .durationMinutes(exam.getDurationMintues())
+                 .totalMarks(exam.getTotalMarks())
+                 .passingMarks(exam.getPassingMarks())
+                 .questionCount(exam.getQuestions() != null ? exam.getQuestions().size() : 0)
+                 .createdAt(exam.getCreatedAt())
+                 .build();
+     }
+
+     public ExamDetailResponse mapToDetailResponse(Exam exam){
+
+          return ExamDetailResponse.builder()
+                  .id(exam.getId())
+                  .title(exam.getTitle())
+                  .description(exam.getDescription())
+                  .category(exam.getCategory())
+                  .difficulty(exam.getDifficulty().name())
+                  .instructions(exam.getInstructions())
+                  .thumbnailUrl(exam.getThumbnailUrl())
+                  .tags(exam.getTags())
+                  .durationMintues(exam.getDurationMintues())
+                  .totalMarks(exam.getTotalMarks())
+                  .passingMarks(exam.getPassingMarks())
+                  .questionCount(exam.getQuestions() != null ? exam.getQuestions().size() : 0)
+                  .createdAt(exam.getCreatedAt())
+                  .questions(exam.getQuestions() != null ? exam.getQuestions().stream().map(q -> questionService.mapToResponse(q,false))
+                          .collect(Collectors.toList()) : List.of())
+                  .build();
+     }
+
+     public Exam findOrThrow(Long id){
+
+         return  examRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Exam not found with id :"+ id));
+     }
+
+     private  void validatePassingMarks(int passing, int total){
+
+         if (passing > total) {
+
+             throw new ValidationException("Passing marks (" + passing +" ) can't exceed" + "total marks ("+ total +").");
+             if (passing <= 0) {
+
+                 throw new ValidationException("Passing marks must be greater than 0.");
+             }
+         }
+     }
+
+     private Exam.DifficultyLevel parseDifficulty(String raw){
+
+         if (raw == null || raw.isBlank()) {
+
+             return Exam.DifficultyLevel.MEDIUM;
+         }
+
+         try {
+             return  Exam.DifficultyLevel.valueOf(raw.toUpperCase());
+         } catch (IllegalArgumentException e) {
+             throw new ValidationException("Invalid difficulty : [" + raw +"]. Use Easy, Medium or Hard.");
+         }
+     }
+
+     private double round(Double value){
+
+         return value != null ? Math.round(value * 10.0) / 10.0 : 0.0;
+     }
+
+     private void logAdminAction(ActionType type, String description){
+
+         try {
+
+             String email = SecurityContextHolder.getContext().getAuthentication().getName();
+             userRepository.findByEmail(email).ifPresent(admin -> {
+                 com.examportal.model.AdminAction action = com.examportal.model.AdminAction.builder()
+                         .admin(admin)
+                         .actionType(type)
+                         .description(description)
+                         .build();
+                 actionRepository.save(action);
+             });
+         } catch (Exception e) {
+
+             log.warn("Could not log admin action [{}] : {]", type,e.getMessage());
+         }
      }
 }

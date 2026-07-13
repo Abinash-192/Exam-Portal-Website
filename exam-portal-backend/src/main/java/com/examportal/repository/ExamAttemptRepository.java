@@ -12,7 +12,10 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
     List<ExamAttempt> findByExamIdOrderByAttemptedAtDesc(Long examId);
 
     int countByUserId(Long userId);
-    int countByExamId(Long examId);
+
+    @Query("SELECT CAST(COUNT(a) AS long) " +
+            "FROM ExamAttempt a WHERE a.exam.id = :examId")
+    Long countByExamId(Long examId);
 
     @Query("SELECT COUNT(a) FROM ExamAttempt a "+ "WHERE a.user.id = :userId AND a.passed = true")
     int countPassedByUserId(Long userId);
@@ -44,9 +47,9 @@ public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, Long> 
 
     @Query("SELECT MAX(a.scoreObtained) FROM ExamAttempt a " +
             "WHERE a.exam.id = :examId")
-    Double maxScoreByExamId(Long examId);
+    Integer maxScoreByExamId(Long examId);
 
     @Query("SELECT MIN(a.scoreObtained) FROM ExamAttempt a " +
             "WHERE a.exam.id = :examId")
-    Double minScoreByExamId(Long examId);
+    Integer minScoreByExamId(Long examId);
 }
