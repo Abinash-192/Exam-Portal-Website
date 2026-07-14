@@ -394,4 +394,46 @@ public class ExamService {
              log.warn("Could not log admin action [{}] : {]", type,e.getMessage());
          }
      }
+
+     @Transactional(readOnly = true)
+     public  ExamSummaryResponse getExamSummary(Long id){
+
+         return mapToSummaryResponse(findOrThrow(id));
+     }
+
+     public long countByCategoryAndActive(String category){
+
+         return examRepository.countByCategoryAndActive(category);
+     }
+
+     @Transactional
+     public ExamSummaryResponse activateExam(Long id){
+
+         Exam exam = findOrThrow(id);
+         if (exam.isActive()) {
+
+             throw new ValidationException("Exam is already active.");
+         }
+
+         exam.setActive(true);
+         Exam saved = examRepository.save(exam);
+         logAdminAction(ActionType.TOGGLE_EXAM, "Activated exam : " + saved.getTitle());
+         log.info("Exam [{}]  activated ", saved.getTitle());
+         return  mapToSummaryResponse(saved);
+     }
+
+     @Transactional
+     public ExamSummaryResponse deactivateExam(Long id){
+
+         Exam exam = findOrThrow(id);
+         if (!exam.isActive()) {
+
+             throw new ValidationException("Exam is already inactive");
+             exam.setActive(false);
+             Exam saved  = examRepository.save(exam);
+             logAdminAction(ActionType.TOGGLE_EXAM, "Deactivated exam : " + saved.getTitle());
+             log.info("Exam [{}] deactivated ", saved.getTitle());
+             return  mapToSummaryResponse(saved);
+         }
+     }
 }
