@@ -35,7 +35,7 @@ public class ExamService {
 
 
      @Transactional
-     public ExamResponse createExam(ExamRequest req){
+     public ExamResponse  createExam(ExamRequest req){
 
          validatePassingMarks(req.getPassingMarks(),
                                 req.getTotalMarks());
@@ -260,7 +260,7 @@ public class ExamService {
          return examRepository.count();
      }
 
-     public ExamResponse mapToFullResponse(Exam exam, boolean includeQuestions,boolean includeStats){
+     public ExamResponse mapToFullResponse(Exam exam, boolean includeQuestions, boolean includeStats){
 
          ExamResponse.ExamResponseBuilder builder = ExamResponse.builder()
                  .id(exam.getId())
@@ -437,3 +437,5 @@ public class ExamService {
          }
      }
 }
+
+

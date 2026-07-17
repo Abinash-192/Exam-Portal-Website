@@ -10,6 +10,6 @@ public class QuestionFilterRequest {
      private String questionType;
 
      private String keyword;
-     
+
      private Boolean aiGenerated;
 }

@@ -10,7 +10,7 @@ import java.util.List;
 @Data
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ExamResponse {
+public class ExamResponse<E> {
 
     private Long id;
     private String title;
