@@ -278,8 +278,6 @@ import com.examportal.dto.request.QuestionRequest;
 import com.examportal.dto.request.BulkQuestionRequest;
 import com.examportal.dto.request.ReorderQuestionsRequest;
 import com.examportal.dto.response.*;
-import com.examportal.model.User;
-import com.examportal.repository.UserRepository;
 import com.examportal.service.ExamAttemptService;
 import com.examportal.service.ExamService;
 import com.examportal.service.QuestionService;
@@ -288,8 +286,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -302,18 +298,12 @@ public class ExamController {
     private final ExamService        examService;
     private final QuestionService    questionService;
     private final ExamAttemptService attemptService;
-    private final UserRepository     userRepository;
 
     // ═════════════════════════════════════════════════════════════
     // USER FACING — Exam Listing & Discovery
     // ═════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/exams
-     * Fetch all ACTIVE exams as summary cards.
-     * Used in student exam listing page.
-     * No questions, no correct answers included.
-     */
+    // GET /api/exams
     @GetMapping
     public ResponseEntity<ApiResponse<List<ExamSummaryResponse>>>
     getAllActiveExams() {
@@ -321,18 +311,7 @@ public class ExamController {
                 examService.getAllActiveExams());
     }
 
-    /**
-     * GET /api/exams/filter
-     * Combined filter — category + difficulty + keyword.
-     *
-     * Query params:
-     *   category   = Java | Python | C# | SQL | JavaScript | General
-     *   difficulty = EASY | MEDIUM | HARD
-     *   keyword    = search term (title / description / tags)
-     *   activeOnly = true (default) | false
-     *
-     * Example: GET /api/exams/filter?category=Java&difficulty=EASY
-     */
+    // GET /api/exams/filter
     @GetMapping("/filter")
     public ResponseEntity<ApiResponse<List<ExamSummaryResponse>>>
     filterExams(ExamFilterRequest filter) {
@@ -340,11 +319,7 @@ public class ExamController {
                 examService.filterExams(filter));
     }
 
-    /**
-     * GET /api/exams/search?keyword=java
-     * Full-text search across title, description, and tags.
-     * Only searches active exams.
-     */
+    // GET /api/exams/search?keyword=
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<ExamSummaryResponse>>>
     searchExams(@RequestParam String keyword) {
@@ -352,11 +327,7 @@ public class ExamController {
                 examService.searchActiveExams(keyword));
     }
 
-    /**
-     * GET /api/exams/category/{category}
-     * Active exams filtered by a specific category.
-     * Categories: Java | Python | C# | SQL | JavaScript | General
-     */
+    // GET /api/exams/category/{category}
     @GetMapping("/category/{category}")
     public ResponseEntity<ApiResponse<List<ExamSummaryResponse>>>
     getByCategory(@PathVariable String category) {
@@ -364,11 +335,7 @@ public class ExamController {
                 examService.getActiveByCategory(category));
     }
 
-    /**
-     * GET /api/exams/difficulty/{difficulty}
-     * Active exams filtered by difficulty.
-     * Difficulty values: EASY | MEDIUM | HARD
-     */
+    // GET /api/exams/difficulty/{difficulty}
     @GetMapping("/difficulty/{difficulty}")
     public ResponseEntity<ApiResponse<List<ExamSummaryResponse>>>
     getByDifficulty(@PathVariable String difficulty) {
@@ -376,11 +343,7 @@ public class ExamController {
                 examService.getActiveByDifficulty(difficulty));
     }
 
-    /**
-     * GET /api/exams/categories
-     * Distinct list of active exam categories.
-     * Used to populate category filter dropdown for students.
-     */
+    // GET /api/exams/categories
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<List<String>>>
     getActiveCategories() {
@@ -388,49 +351,7 @@ public class ExamController {
                 examService.getActiveCategories());
     }
 
-    /**
-     * GET /api/exams/{id}
-     * Full exam detail for student.
-     * Includes all questions WITHOUT correct answers.
-     * Used when student views exam details before starting.
-     * Throws 400 if exam is inactive.
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ExamDetailResponse>>
-    getExamForUser(@PathVariable Long id) {
-        return ok("Exam detail fetched.",
-                examService.getExamForUser(id));
-    }
-
-    /**
-     * GET /api/exams/{id}/summary
-     * Lightweight exam summary for student — no questions included.
-     * Used in exam card / listing UI.
-     */
-    @GetMapping("/{id}/summary")
-    public ResponseEntity<ApiResponse<ExamSummaryResponse>>
-    getExamSummary(@PathVariable Long id) {
-        return ok("Exam summary.",
-                examService.getExamSummary(id));
-    }
-
-    /**
-     * GET /api/exams/category/{category}/count
-     * Count of active exams in a specific category.
-     * Used for category badge in UI.
-     */
-    @GetMapping("/category/{category}/count")
-    public ResponseEntity<ApiResponse<Long>>
-    countByCategory(@PathVariable String category) {
-        return ok("Exam count by category.",
-                examService.countByCategoryAndActive(category));
-    }
-
-    /**
-     * GET /api/exams/count/active
-     * Total count of all active exams.
-     * Used in student dashboard stats.
-     */
+    // GET /api/exams/count/active
     @GetMapping("/count/active")
     public ResponseEntity<ApiResponse<Long>>
     countActiveExams() {
@@ -438,17 +359,43 @@ public class ExamController {
                 examService.countActiveExams());
     }
 
+    // GET /api/exams/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ExamDetailResponse>>
+    getExamForUser(@PathVariable Long id) {
+        return ok("Exam detail fetched.",
+                examService.getExamForUser(id));
+    }
+
+    // GET /api/exams/{id}/summary
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<ApiResponse<ExamSummaryResponse>>
+    getExamSummary(@PathVariable Long id) {
+        return ok("Exam summary.",
+                examService.getExamSummary(id));
+    }
+
+    // GET /api/exams/category/{category}/count
+    @GetMapping("/category/{category}/count")
+    public ResponseEntity<ApiResponse<Long>>
+    countByCategory(@PathVariable String category) {
+        return ok("Exam count by category.",
+                examService.countByCategoryAndActive(category));
+    }
+
+    // GET /api/exams/{examId}/questions/user
+    @GetMapping("/{examId}/questions/user")
+    public ResponseEntity<ApiResponse<List<QuestionResponse>>>
+    getQuestionsForUser(@PathVariable Long examId) {
+        return ok("Questions for exam.",
+                questionService.getQuestionsForUser(examId));
+    }
+
     // ═════════════════════════════════════════════════════════════
-    // ADMIN FACING — Exam Management
+    // ADMIN FACING — Exam Read & Analytics
     // ═════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/exams/admin/all
-     * All exams including INACTIVE — with admin stats.
-     * Each exam includes:
-     *   totalAttempts, totalPassed, avgScore, passRate
-     * Used in admin exam management table.
-     */
+    // GET /api/exams/admin/all
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<ExamResponse>>>
@@ -457,11 +404,7 @@ public class ExamController {
                 examService.getAllExamsAdmin());
     }
 
-    /**
-     * GET /api/exams/admin/categories
-     * All distinct categories including inactive exams.
-     * Used to populate category dropdown in admin panel.
-     */
+    // GET /api/exams/admin/categories
     @GetMapping("/admin/categories")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<String>>>
@@ -470,11 +413,7 @@ public class ExamController {
                 examService.getAllCategories());
     }
 
-    /**
-     * GET /api/exams/admin/count/all
-     * Total exam count (active + inactive).
-     * Used in admin dashboard stats.
-     */
+    // GET /api/exams/admin/count/all
     @GetMapping("/admin/count/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Long>>
@@ -483,14 +422,7 @@ public class ExamController {
                 examService.countAllExams());
     }
 
-    /**
-     * GET /api/exams/admin/{id}
-     * Full exam detail for admin view.
-     * Includes:
-     *   - All questions WITH correct answers & explanations
-     *   - Admin stats: totalAttempts, passRate, avgScore
-     * Used in popup edit modal & exam detail page.
-     */
+    // GET /api/exams/admin/{id}
     @GetMapping("/admin/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamResponse>>
@@ -499,14 +431,7 @@ public class ExamController {
                 examService.getExamForAdmin(id));
     }
 
-    /**
-     * GET /api/exams/admin/{id}/stats
-     * Per-exam analytics dashboard.
-     * Returns:
-     *   totalAttempts, totalPassed, totalFailed,
-     *   passRate (%), avgScore, avgPercentage,
-     *   highestScore, lowestScore
-     */
+    // GET /api/exams/admin/{id}/stats
     @GetMapping("/admin/{id}/stats")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamStatsResponse>>
@@ -515,13 +440,7 @@ public class ExamController {
                 examService.getExamStats(id));
     }
 
-    /**
-     * GET /api/exams/admin/{id}/results
-     * All student attempt results for a specific exam.
-     * Admin uses this to review student performance.
-     * Each result: userName, score, percentage, passed,
-     *   correctAnswers, timeTaken, performanceBand
-     */
+    // GET /api/exams/admin/{id}/results
     @GetMapping("/admin/{id}/results")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<AttemptResultResponse>>>
@@ -534,54 +453,19 @@ public class ExamController {
     // ADMIN FACING — Exam CRUD
     // ═════════════════════════════════════════════════════════════
 
-    /**
-     * POST /api/exams
-     * Create a new exam.
-     *
-     * Required fields:
-     *   title, category, durationMinutes,
-     *   totalMarks, passingMarks, difficulty
-     *
-     * Optional:
-     *   description, instructions, thumbnailUrl, tags
-     *   questions[] — embed on create
-     *
-     * Validations:
-     *   - Title must be unique (case-insensitive)
-     *   - passingMarks <= totalMarks
-     *   - durationMinutes: 1–180
-     *   - difficulty: EASY | MEDIUM | HARD
-     *
-     * Returns HTTP 201 Created.
-     */
+    // POST /api/exams
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamResponse>>
     createExam(@Valid @RequestBody ExamRequest req) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(
+                .body(ApiResponse.created(
                         "Exam created successfully.",
                         examService.createExam(req)));
     }
 
-    /**
-     * PUT /api/exams/{id}
-     * Update exam — triggered from popup edit modal.
-     *
-     * Editable fields:
-     *   title, description, category,
-     *   durationMinutes (exam timing),
-     *   totalMarks, passingMarks,
-     *   difficulty, active,
-     *   instructions, tags, thumbnailUrl
-     *
-     * Validations:
-     *   - Title unique (excluding current exam id)
-     *   - passingMarks <= totalMarks
-     *
-     * Action is audit-logged.
-     */
+    // PUT /api/exams/{id}
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamResponse>>
@@ -591,16 +475,7 @@ public class ExamController {
                 examService.updateExam(id, req));
     }
 
-    /**
-     * DELETE /api/exams/{id}
-     * Permanently delete an exam.
-     *
-     * Cascade deletes:
-     *   - All questions and options
-     *   - All attempt records and attempt answers
-     *
-     * Action is audit-logged.
-     */
+    // DELETE /api/exams/{id}
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>>
@@ -609,15 +484,7 @@ public class ExamController {
         return ok("Exam permanently deleted.", null);
     }
 
-    /**
-     * PATCH /api/exams/{id}/toggle
-     * Toggle exam between ACTIVE and INACTIVE.
-     *
-     * Active   = visible to students, can be attempted
-     * Inactive = hidden from students
-     *
-     * Action is audit-logged.
-     */
+    // PATCH /api/exams/{id}/toggle
     @PatchMapping("/{id}/toggle")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamSummaryResponse>>
@@ -626,11 +493,7 @@ public class ExamController {
                 examService.toggleStatus(id));
     }
 
-    /**
-     * PATCH /api/exams/{id}/activate
-     * Explicitly activate an exam.
-     * Convenience endpoint (same result as toggle when inactive).
-     */
+    // PATCH /api/exams/{id}/activate
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamSummaryResponse>>
@@ -639,11 +502,7 @@ public class ExamController {
                 examService.activateExam(id));
     }
 
-    /**
-     * PATCH /api/exams/{id}/deactivate
-     * Explicitly deactivate (hide) an exam.
-     * Convenience endpoint (same result as toggle when active).
-     */
+    // PATCH /api/exams/{id}/deactivate
     @PatchMapping("/{id}/deactivate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ExamSummaryResponse>>
@@ -653,15 +512,10 @@ public class ExamController {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // ADMIN FACING — Question Management (inside exam popup editor)
+    // ADMIN FACING — Question Management
     // ═════════════════════════════════════════════════════════════
 
-    /**
-     * GET /api/exams/{examId}/questions
-     * All questions for an exam WITH correct answers + explanations.
-     * Used in admin popup edit modal to show existing questions.
-     * Supports: Java | Python | C# | SQL | JavaScript | General
-     */
+    // GET /api/exams/{examId}/questions
     @GetMapping("/{examId}/questions")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<QuestionResponse>>>
@@ -670,11 +524,7 @@ public class ExamController {
                 questionService.getQuestionsForAdmin(examId));
     }
 
-    /**
-     * GET /api/exams/{examId}/questions/summaries
-     * Lightweight question list — no options, no answers.
-     * Used in admin exam overview table for quick scan.
-     */
+    // GET /api/exams/{examId}/questions/summaries
     @GetMapping("/{examId}/questions/summaries")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<QuestionSummaryResponse>>>
@@ -683,23 +533,7 @@ public class ExamController {
                 questionService.getQuestionSummaries(examId));
     }
 
-    /**
-     * GET /api/exams/{examId}/questions/user
-     * All questions for a specific exam WITHOUT correct answers.
-     * Used when student is taking the exam.
-     */
-    @GetMapping("/{examId}/questions/user")
-    public ResponseEntity<ApiResponse<List<QuestionResponse>>>
-    getQuestionsForUser(@PathVariable Long examId) {
-        return ok("Questions for exam.",
-                questionService.getQuestionsForUser(examId));
-    }
-
-    /**
-     * GET /api/exams/{examId}/questions/language/{language}
-     * Questions filtered by programming language.
-     * Languages: java | python | csharp | sql | javascript | general
-     */
+    // GET /api/exams/{examId}/questions/language/{language}
     @GetMapping("/{examId}/questions/language/{language}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<QuestionResponse>>>
@@ -709,11 +543,7 @@ public class ExamController {
                 questionService.getByLanguage(examId, language));
     }
 
-    /**
-     * GET /api/exams/{examId}/questions/count
-     * Total question count for an exam.
-     * Used in admin exam card stat badge.
-     */
+    // GET /api/exams/{examId}/questions/count
     @GetMapping("/{examId}/questions/count")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Integer>>
@@ -722,115 +552,7 @@ public class ExamController {
                 questionService.countByExam(examId));
     }
 
-    /**
-     * POST /api/exams/{examId}/questions
-     * Add a single MCQ question to an exam.
-     *
-     * Supports:
-     *   - Java, Python, C#, SQL, JavaScript questions
-     *   - Optional code snippet with language tag
-     *   - 2–4 options (A, B, C, D)
-     *   - correctOptionIndex (0-based)
-     *   - Optional explanation shown post-submission
-     *
-     * Returns HTTP 201 Created.
-     * Action is audit-logged.
-     */
-    @PostMapping("/{examId}/questions")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<QuestionResponse>>
-    addQuestion(@PathVariable Long examId,
-                @Valid @RequestBody QuestionRequest req) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(
-                        "Question added.",
-                        questionService.addQuestion(examId, req)));
-    }
-
-    /**
-     * POST /api/exams/{examId}/questions/bulk
-     * Add multiple questions at once — used in popup editor
-     * when admin pastes or imports a full question set.
-     *
-     * Body: { "questions": [ {...}, {...} ] }
-     * Returns HTTP 201 Created.
-     */
-    @PostMapping("/{examId}/questions/bulk")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<QuestionResponse>>>
-    addBulkQuestions(
-            @PathVariable Long examId,
-            @Valid @RequestBody BulkQuestionRequest req) {
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(
-                        "Questions added in bulk.",
-                        questionService.addBulkQuestions(
-                                examId, req)));
-    }
-
-    /**
-     * PUT /api/exams/{examId}/questions/{questionId}
-     * Update a specific question within an exam.
-     * Replaces content, code snippet, options, correct answer,
-     * and explanation.
-     * Action is audit-logged.
-     */
-    @PutMapping("/{examId}/questions/{questionId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<QuestionResponse>>
-    updateQuestion(
-            @PathVariable Long examId,
-            @PathVariable Long questionId,
-            @Valid @RequestBody QuestionRequest req) {
-        return ok("Question updated.",
-                questionService.updateQuestion(
-                        questionId, req));
-    }
-
-    /**
-     * DELETE /api/exams/{examId}/questions/{questionId}
-     * Delete a question from an exam.
-     * Remaining questions are automatically re-ordered.
-     * Action is audit-logged.
-     */
-    @DeleteMapping("/{examId}/questions/{questionId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>>
-    deleteQuestion(
-            @PathVariable Long examId,
-            @PathVariable Long questionId) {
-        questionService.deleteQuestion(questionId);
-        return ok("Question deleted.", null);
-    }
-
-    /**
-     * PATCH /api/exams/{examId}/questions/reorder
-     * Reorder questions using drag-and-drop in popup editor.
-     *
-     * Body:
-     * {
-     *   "orderedQuestionIds": [3, 1, 4, 2]
-     * }
-     *
-     * Each ID gets its position index as the new order (1-based).
-     */
-    @PatchMapping("/{examId}/questions/reorder")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<QuestionSummaryResponse>>>
-    reorderQuestions(
-            @PathVariable Long examId,
-            @Valid @RequestBody ReorderQuestionsRequest req) {
-        return ok("Questions reordered.",
-                questionService.reorderQuestions(examId, req));
-    }
-
-    /**
-     * GET /api/exams/questions/admin/{questionId}
-     * Get a single question detail including correct answer.
-     * Used in admin question edit form.
-     */
+    // GET /api/exams/questions/admin/{questionId}
     @GetMapping("/questions/admin/{questionId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<QuestionResponse>>
@@ -839,22 +561,76 @@ public class ExamController {
                 questionService.getQuestionById(questionId));
     }
 
+    // POST /api/exams/{examId}/questions
+    @PostMapping("/{examId}/questions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<QuestionResponse>>
+    addQuestion(@PathVariable Long examId,
+                @Valid @RequestBody QuestionRequest req) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.created(
+                        "Question added.",
+                        questionService.addQuestion(examId, req)));
+    }
+
+    // POST /api/exams/{examId}/questions/bulk
+    @PostMapping("/{examId}/questions/bulk")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<QuestionResponse>>>
+    addBulkQuestions(@PathVariable Long examId,
+                     @Valid @RequestBody
+                     BulkQuestionRequest req) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.created(
+                        "Questions added in bulk.",
+                        questionService.addBulkQuestions(
+                                examId, req)));
+    }
+
+    // PUT /api/exams/{examId}/questions/{questionId}
+    @PutMapping("/{examId}/questions/{questionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<QuestionResponse>>
+    updateQuestion(@PathVariable Long examId,
+                   @PathVariable Long questionId,
+                   @Valid @RequestBody QuestionRequest req) {
+        return ok("Question updated.",
+                questionService.updateQuestion(questionId, req));
+    }
+
+    // DELETE /api/exams/{examId}/questions/{questionId}
+    @DeleteMapping("/{examId}/questions/{questionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>>
+    deleteQuestion(@PathVariable Long examId,
+                   @PathVariable Long questionId) {
+        questionService.deleteQuestion(questionId);
+        return ok("Question deleted.", null);
+    }
+
+    // PATCH /api/exams/{examId}/questions/reorder
+    @PatchMapping("/{examId}/questions/reorder")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<List<QuestionSummaryResponse>>>
+    reorderQuestions(@PathVariable Long examId,
+                     @Valid @RequestBody
+                     ReorderQuestionsRequest req) {
+        return ok("Questions reordered.",
+                questionService.reorderQuestions(examId, req));
+    }
+
     // ═════════════════════════════════════════════════════════════
-    // ADMIN FACING — Attempt Results Management
+    // ADMIN FACING — Results Management
     // ═════════════════════════════════════════════════════════════
 
-    /**
-     * POST /api/exams/{examId}/results/{attemptId}/resend-email
-     * Admin manually re-dispatches the result email
-     * to the student for a specific attempt.
-     * Used when automatic email failed on submission.
-     */
+    // POST /api/exams/{examId}/results/{attemptId}/resend-email
     @PostMapping("/{examId}/results/{attemptId}/resend-email")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>>
-    resendResultEmail(
-            @PathVariable Long examId,
-            @PathVariable Long attemptId) {
+    resendResultEmail(@PathVariable Long examId,
+                      @PathVariable Long attemptId) {
         attemptService.resendResultEmail(attemptId);
         return ok("Result email re-dispatched.", null);
     }

@@ -332,7 +332,7 @@ public class AdminController {
      createExam(@Valid @RequestBody ExamRequest req) {
           return ResponseEntity
                   .status(HttpStatus.CREATED)
-                  .body(ApiResponse.success(
+                  .body(ApiResponse.created(
                           "Exam created successfully.",
                           examService.createExam(req)));
      }
@@ -397,7 +397,7 @@ public class AdminController {
                  @Valid @RequestBody QuestionRequest req) {
           return ResponseEntity
                   .status(HttpStatus.CREATED)
-                  .body(ApiResponse.success(
+                  .body(ApiResponse.created(
                           "Question added.",
                           questionService.addQuestion(examId, req)));
      }
@@ -409,7 +409,7 @@ public class AdminController {
                       @Valid @RequestBody BulkQuestionRequest req) {
           return ResponseEntity
                   .status(HttpStatus.CREATED)
-                  .body(ApiResponse.success(
+                  .body(ApiResponse.created(
                           "Questions added in bulk.",
                           questionService.addBulkQuestions(examId, req)));
      }
