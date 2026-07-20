@@ -5,6 +5,8 @@ import jakarta.validation.constraints.*;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class QuestionRequest {
 
@@ -21,7 +23,6 @@ public class QuestionRequest {
 
     @Min(value = 1, message = "Marks must be at least 1")
     @Max(value = 10, message = "marks cannot exceed 10")
-    @Builder.Default
     private int marks = 1;
 
     @Min(value = 0,message = "Question order must be >= 0")
@@ -42,5 +43,20 @@ public class QuestionRequest {
 
     private  boolean aiGenerated = false;
 
-    
+    @Data
+    public static  class OptionRequest {
+
+        @NotBlank(message = "Option label is required ")
+        @Pattern(regexp = "^[A-Da-d]$", message = "Label must be A, B, C , D")
+        private String optionLabel;
+
+        @NotBlank(message = "Option text is required")
+        @Size(min = 1, max = 1000, message = "Option text must be 1-1000 characters")
+        private String optionText;
+
+        @Size(max = 3000,
+                message = "Option code must not exceed 3000 characters")
+        private String optionCode;
+
+    }
 }
