@@ -2,7 +2,10 @@ package com.examportal.service;
 
 import com.examportal.dto.request.BulkQuestionRequest;
 import com.examportal.dto.request.QuestionRequest;
+import com.examportal.dto.request.ReorderQuestionsRequest;
 import com.examportal.dto.response.QuestionResponse;
+import com.examportal.dto.response.QuestionSummaryResponse;
+import com.examportal.exception.ValidationException;
 import com.examportal.model.AdminAction;
 import com.examportal.model.Exam;
 import com.examportal.model.Option;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -104,5 +108,55 @@ public class QuestionService {
          logAdminAction(AdminAction.ActionType.UPDATE_EXAM, "Updated question id = [" + questionId + "]");
          log.info("Question [{]] updated ",questionId);
          return  mapToResponse(saved,true);
+     }
+
+     @Transactional
+     public  void deleteQuestion(Long  questionId) {
+
+         Question question  =  findQuestionOrThrow(questionId);
+         Long  examId  = question.getExam().getId();
+         int  deletedOrder  = question.getQuestionOrder();
+
+         questionRepository.delete(question);
+         questionRepository.shiftOrdersAfterDelete(examId,deletedOrder);
+
+         logAdminAction(AdminAction.ActionType.DELETE_QUESTION, "Deleted question id =[" + questionId + " ]");
+         log.info("Question [{}] deleted , orders shifted ", questionId);
+     }
+
+     @Transactional
+     public List<QuestionSummaryResponse>  reorderQuestions(Long examId, ReorderQuestionsRequest req) {
+
+         findExamOrThrow(examId);
+
+         List<Long> ids  = req.getOrderedQuestionIds();
+         for (int i = 0; i < ids.size(); i++) {
+
+             Question q = findQuestionOrThrow(ids.get(i));
+             if (!q.getExam().getId().equals(examId)) {
+
+                 throw new ValidationException("Question [" + ids.get(i) + "] does not belong to them [" + examId +"].");
+             }
+             q.setQuestionOrder(i+1);
+             questionRepository.save(q);
+         }
+         logAdminAction(AdminAction.ActionType.REORDER_QUESTIONS, "Reordered questions for exam [" + examId + "]");
+         log.info("Questions reordered for exam [{}]", examId);
+
+
+         return questionRepository.findByExamIdOrderByQuestionOrder(examId)
+                 .stream()
+                 .map(this::mapToResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<QuestionResponse> getQuestionsForUser(Long examId){
+
+         findExamOrThrow(examId);
+         return questionRepository.findByExamIdOrderByQuestionOrder(examId)
+                 .stream()
+                 .map(q -> mapToResponse(q,false))
+                 .collect(Collectors.toList());
      }
 }
