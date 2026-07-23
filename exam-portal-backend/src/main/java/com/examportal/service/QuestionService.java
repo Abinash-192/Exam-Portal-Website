@@ -1,6 +1,7 @@
 package com.examportal.service;
 
 import com.examportal.dto.request.BulkQuestionRequest;
+import com.examportal.dto.request.QuestionFilterRequest;
 import com.examportal.dto.request.QuestionRequest;
 import com.examportal.dto.request.ReorderQuestionsRequest;
 import com.examportal.dto.response.QuestionResponse;
@@ -159,4 +160,101 @@ public class QuestionService {
                  .map(q -> mapToResponse(q,false))
                  .collect(Collectors.toList());
      }
+
+     @Transactional(readOnly = true)
+     public  List<QuestionResponse>  getQuestionsForAdmin(Long examId){
+
+         findExamOrThrow(examId);
+         return questionRepository.findByExamIdOrderByQuestionOrder(examId)
+                 .stream()
+                 .map(q -> mapToResponse(q, true))
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<QuestionSummaryResponse>  getQuestionSummaries(Long examId) {
+
+         findExamOrThrow(examId);
+         return questionRepository.findByExamIdOrderByQuestionOrder(examId)
+                 .stream()
+                 .map(this::mapToSummaryResponse)
+                 .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<QuestionResponse>  getByLanguage(String language, Long examId){
+
+          findExamOrThrow(examId);
+          return questionRepository.findByExamIdAndLanguage(examId,normalizeLanguage(language))
+                  .stream()
+                  .map(q -> mapToResponse(q, false))
+                  .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<QuestionResponse>  getByType(Long examId, String type){
+
+          findExamOrThrow(examId);
+          return questionRepository.findByExamIdAndType(examId,normalizeType(type))
+                  .stream()
+                  .map(q -> mapToResponse(q, false))
+                  .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public List<QuestionResponse>  getByLanguageAndType(Long examId, String language, String type) {
+
+          findExamOrThrow(examId);
+          return questionRepository.findByExamIdAndLanguageAndType(examId, normalizeLanguage(language), normalizeType(type))
+                  .stream()
+                  .map(q -> mapToResponse(q, false))
+                  .collect(Collectors.toList());
+     }
+
+     @Transactional(readOnly = true)
+     public QuestionResponse getQuestionById(Long questionId) {
+
+         return mapToResponse(findQuestionOrThrow(questionId), true);
+     }
+
+     public int countByExam(Long examId) {
+
+         return questionRepository.countByExamId(examId);
+     }
+
+     public int sumMarksByExam(Long examId) {
+
+         return questionRepository.sumMarksByExamId(examId);
+     }
+
+     @Transactional(readOnly = true)
+     public  List<QuestionResponse>  filterQuestions(Long examId,
+                                                     QuestionFilterRequest filter,
+                                                     boolean includeAnswers) {
+          findExamOrThrow(examId);
+          List<Question> questions ;
+         if (filter.getKeyword() != null && !filter.getKeyword().isBlank()) {
+
+             questions = questionRepository.searchByContent(examId, filter.getKeyword());
+         } else if (filter.getLanguage() != null && filter.getQuestionType() != null) {
+
+             questions = questionRepository.findByExamIdAndLanguageAndType(examId, normalizeLanguage(filter.getLanguage()), normalizeType(filter.getQuestionType()));
+         } else if (filter.getLanguage() != null) {
+
+             questions = questionRepository.findByExamIdAndLanguage(examId, normalizeLanguage(filter.getLanguage()));
+         } else if (filter.getQuestionType() != null) {
+
+             questions = questionRepository.findByExamIdAndType(examId, normalizeType(filter.getQuestionType()));
+         } else if (Boolean.TRUE.equals(filter.getAiGenerated())) {
+
+             questions = questionRepository.findAiGeneratedByExamId(examId);
+         } else {
+
+             questions = questionRepository.findByExamIdOrderByQuestionOrder(examId);
+         }
+         return questions.stream()
+                 .map(q -> mapToResponse(q, includeAnswers))
+                 .collect(Collectors.toList());
+     }
+
 }
