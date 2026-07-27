@@ -266,8 +266,9 @@ public class AdminController {
                  @RequestBody(required = false)
                  AdminActionRequest req) {
           return ok("User unblocked. They can access the portal again.",
-                  adminService.unblockUser(id,
-                          req != null ? req.getReason() : null));
+//                  adminService.unblockUser(id,
+//                          req != null ? req.getReason() : null));
+                  adminService.unBlockUser(id, req != null ? req.getReason() : null));
      }
 
      // PATCH /api/admin/users/{id}
