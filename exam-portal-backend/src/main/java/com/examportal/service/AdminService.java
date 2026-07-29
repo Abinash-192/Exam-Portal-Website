@@ -217,7 +217,7 @@ public class AdminService {
          userRepository.save(user);
 
          logAction(admin, user, ActionType.UNBLOCK_USER, reason != null ? reason : "Unblocked by admin");
-         broadCastAdminEvent("USER_UNBLOCKED", Map.of(
+         broadcastAdminEvent("USER_UNBLOCKED", Map.of(
                  "userId", user.getId(),"userName",
                  user.getName(),
                  "email", user.getEmail()));
@@ -274,7 +274,7 @@ public class AdminService {
      @Transactional(readOnly = true)
      public List<AttemptResultResponse> getExamResults(Long examId){
 
-         if (!examRepository.existsById()) {
+         if (!examRepository.existsById(examId)) {
 
              throw new ResourceNotFoundException("Exam not found : " + examId);
          }
@@ -287,11 +287,11 @@ public class AdminService {
                          .scoreObtained(a.getScoreObtained())
                          .totalMarks(a.getTotalMarks())
                          .percentage(a.getPercentage())
-                         .passed(a.isPssed())
-                         .correctAnsers(a.getCorrectAnswers())
-                         .wrongAnsers(a.getWrongAnsers())
+                         .passed(a.isPassed())
+                         .correctAnswers(a.getCorrectAnswers())
+                         .wrongAnswers(a.getWrongAnswers())
                          .unanswered(a.getUnanswered())
-                         .timeTakenSeconds(a.getgetTimeTakenSecons())
+                         .timeTakenSeconds(a.getTimeTakenSeconds())
                          .performanceBand(computePerformanceBand(a.getPercentage()))
                          .attemptedAt(a.getAttemptedAt()).build())
                  .collect(Collectors.toList());
@@ -303,7 +303,7 @@ public class AdminService {
          findUserOrThrow(userId);
 
          return attemptRepository
-                 .findByUserIdOrderByAttemptedAtDesc(userId0)
+                 .findByUserIdOrderByAttemptedAtDesc(userId)
                  .stream()
                  .map(a -> AttemptResultResponse.builder()
                          .attemptId(a.getId())
@@ -324,7 +324,7 @@ public class AdminService {
      @Transactional(readOnly = true)
      public List<AdminActivityResponse> getRecentActivity(){
 
-         return actionRepository.findByTop20ByOrderByPerformedAtDesc()
+         return actionRepository.findTop20ByOrderByPerformedAtDesc()
                  .stream().map(this::mapToActivityResponse)
                  .collect(Collectors.toList());
      }

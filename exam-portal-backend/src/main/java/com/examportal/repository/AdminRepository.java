@@ -121,4 +121,10 @@ public interface AdminRepository extends JpaRepository<User, Long> {
             "AND ( LOWER(u.name)  LIKE LOWER(CONCAT('%',:kw,'%')) " +
             "  OR  LOWER(u.email) LIKE LOWER(CONCAT('%',:kw,'%')))")
     List<User> searchStudents(String kw);
+
+    @Query("SELECT u FROM User u "+
+            "WHERE u.role = 'USER' " +
+            "AND (LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%'))" +
+            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<User> searchUsers(String keyword);
 }
