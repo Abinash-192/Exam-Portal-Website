@@ -148,7 +148,7 @@ public class User {
     @Builder.Default
     private boolean mobileVerified = false;
 
-    // ── OAuth2 provider (local | google | github) ──────────────────
+    // ── OAuth2 provider (local | google | GitHub) ──────────────────
     @Column(name = "provider", length = 30)
     @Builder.Default
     private String provider = "local";

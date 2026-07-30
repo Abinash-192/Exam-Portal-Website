@@ -3,6 +3,7 @@ package com.examportal.security.oauth2;
 import com.examportal.model.Role;
 import com.examportal.model.User;
 import com.examportal.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -12,6 +13,7 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 @Slf4j
+@RequiredArgsConstructor
 public class CustomOAuth2UserService  implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
     private final UserRepository userRepository;
@@ -38,7 +40,7 @@ public class CustomOAuth2UserService  implements OAuth2UserService<OAuth2UserReq
                            .profilePicture(userInfo.getImageUrl())
                            .role(Role.USER)
                            .provider(registrationId)
-                           .emailverified(true)
+                           .emailVerified(true)
                            .enabled(false)
                            .approved(false)
                            .blocked(false)
