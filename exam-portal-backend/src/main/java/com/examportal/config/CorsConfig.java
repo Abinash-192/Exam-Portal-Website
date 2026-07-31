@@ -1,11 +1,12 @@
 package com.examportal.config;
 
-import org.apache.catalina.filters.CorsFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -14,39 +15,50 @@ import java.util.List;
 public class CorsConfig {
 
     @Value("${app.frontend-url}")
-   private  String frontendUrl;
+    private String frontendUrl;
 
     @Bean
-   public CorsFilter corsFilter() {
-       CorsConfiguration config = new CorsConfiguration();
+    public CorsFilter corsFilter() {
 
-       config.setAllowedOrigins(List.of(
-               frontendUrl,
-               "http://localhost:3000"
-               ));
-       config.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","OPTIONS","PATCH"));
+        CorsConfiguration config = new CorsConfiguration();
 
-       config.setAllowedHeaders(Arrays.asList(
-               "Authorization",
-               "Content-Type",
-               "Accept",
-               "X-Requested-With",
-               "Origin",
-               "Access-Control-Request-Method",
-               "Access-Control-Request-Headers"
-       ));
-       config.setExposedHeaders(Arrays.asList(
-               "Authorization",
-               "Content-Disposition"
-       ));
-       config.setAllowCredentials(true);
-       config.setMaxAge(3600L);
+        // ── Allowed origins ───────────────────────────────────────
+        config.setAllowedOrigins(List.of(
+                frontendUrl,
+                "http://localhost:3000",
+                "http://localhost:5173"
+        ));
 
-//       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-//       source.registerCorsConfiguration("/**",config);
+        // ── Allowed HTTP methods ──────────────────────────────────
+        config.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT",
+                "DELETE", "OPTIONS", "PATCH"
+        ));
 
-       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-       source.registerCorsConfiguration("/**",config);
-       return  new CorsFilter(source);
-   }
+        // ── Allowed headers ───────────────────────────────────────
+        config.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Requested-With",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers"
+        ));
+
+        // ── Exposed headers ───────────────────────────────────────
+        config.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Disposition"
+        ));
+
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return new CorsFilter(source);
+    }
 }
