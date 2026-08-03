@@ -1,10 +1,10 @@
 package com.examportal.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,18 +24,18 @@ public class AttemptResultResponse {
     private String status;
 
     // ── Timer ─────────────────────────────────────────────────────
-    private int    allowedTimeSeconds;
-    private int    timeTakenSeconds;
-    private int    remainingTimeSeconds;
-    private String timeTakenFormatted;
+    private int     allowedTimeSeconds;
+    private int     timeTakenSeconds;
+    private int     remainingTimeSeconds;
+    private String  timeTakenFormatted;
     private boolean autoSubmitted;
 
     // ── Score ─────────────────────────────────────────────────────
-    private int    scoreObtained;
-    private int    totalMarks;
-    private double percentage;
+    private int     scoreObtained;
+    private int     totalMarks;
+    private double  percentage;
     private boolean passed;
-    private int    passingMarks;
+    private int     passingMarks;
 
     // ── Breakdown ─────────────────────────────────────────────────
     private int correctAnswers;
