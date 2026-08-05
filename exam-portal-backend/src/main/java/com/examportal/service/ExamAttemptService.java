@@ -40,7 +40,7 @@ public class ExamAttemptService {
     private final QuestionService         questionService;
 
     // ═════════════════════════════════════════════════════════════
-    // START ATTEMPT
+    // START ATTEMPT — initialise timer
     // ═════════════════════════════════════════════════════════════
 
     @Transactional
@@ -49,6 +49,7 @@ public class ExamAttemptService {
 
         User user = findUserOrThrow(userId);
 
+        // ── Admin approval guard ───────────────────────────────────
         if (!user.isApproved())
             throw new ValidationException(
                     "Your account is not approved by admin. " +
@@ -60,7 +61,8 @@ public class ExamAttemptService {
                     "Your account is blocked. " +
                             "Contact admin for support.");
 
-        Exam exam = examRepository.findById(req.getExamId())
+        Exam exam = examRepository
+                .findById(req.getExamId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Exam not found: " + req.getExamId()));
 
@@ -68,6 +70,7 @@ public class ExamAttemptService {
             throw new ValidationException(
                     "This exam is not currently available.");
 
+        // ── Resume if IN_PROGRESS attempt exists ──────────────────
         Optional<ExamAttempt> existing =
                 attemptRepository.findByUserIdAndExamIdAndStatus(
                         userId, req.getExamId(),
@@ -82,6 +85,7 @@ public class ExamAttemptService {
             return buildStartResponse(resume, exam, questions);
         }
 
+        // ── Prevent re-attempt ────────────────────────────────────
         boolean alreadyDone =
                 attemptRepository.existsByUserIdAndExamIdAndStatusIn(
                         userId, req.getExamId(),
@@ -92,11 +96,13 @@ public class ExamAttemptService {
             throw new ValidationException(
                     "You have already attempted this exam.");
 
+        // ── Timer setup ───────────────────────────────────────────
         LocalDateTime now       = LocalDateTime.now();
         LocalDateTime expiresAt = now.plusMinutes(
                 exam.getDurationMintues());
-        int allowedSeconds = exam.getDurationMintues() * 60;
+        int allowedSeconds      = exam.getDurationMintues() * 60;
 
+        // ── Create attempt ────────────────────────────────────────
         ExamAttempt attempt = ExamAttempt.builder()
                 .user(user)
                 .exam(exam)
@@ -112,7 +118,7 @@ public class ExamAttemptService {
         List<Question> questions = questionRepository
                 .findByExamIdOrderByQuestionOrder(exam.getId());
 
-        // ✅ FIX 1: HashMap instead of Map.of() — no ambiguity
+        // ── Notify admin exam started ─────────────────────────────
         Map<String, Object> startPayload = new HashMap<>();
         startPayload.put("event",     "EXAM_STARTED");
         startPayload.put("user",      user.getName());
@@ -120,7 +126,7 @@ public class ExamAttemptService {
         startPayload.put("exam",      exam.getTitle());
         startPayload.put("attemptId", saved.getId());
         startPayload.put("expiresAt", expiresAt.toString());
-        ws.convertAndSend("/topic/admin/activity", startPayload);
+        sendToAdmin(startPayload);
 
         log.info("Attempt [{}] started by [{}] expires [{}]",
                 saved.getId(), userId, expiresAt);
@@ -129,7 +135,7 @@ public class ExamAttemptService {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // SAVE ANSWER
+    // SAVE ANSWER (auto-save per question click)
     // ═════════════════════════════════════════════════════════════
 
     @Transactional
@@ -143,14 +149,15 @@ public class ExamAttemptService {
 
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS)
             throw new ValidationException(
-                    "Exam is not in progress. " +
-                            "Status: " + attempt.getStatus());
+                    "Exam is not in progress. Status: " +
+                            attempt.getStatus());
 
         if (LocalDateTime.now().isAfter(attempt.getExpiresAt()))
             throw new ValidationException(
                     "Exam time has expired. " +
                             "Your exam will be auto-submitted.");
 
+        // ── Upsert answer ─────────────────────────────────────────
         Optional<AttemptAnswer> existing =
                 answerRepository.findByAttemptIdAndQuestionId(
                         req.getAttemptId(), req.getQuestionId());
@@ -172,7 +179,7 @@ public class ExamAttemptService {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // GET TIMER STATUS
+    // GET TIMER STATUS (frontend polls every 30 sec)
     // ═════════════════════════════════════════════════════════════
 
     public TimerStatusResponse getTimerStatus(
@@ -196,8 +203,8 @@ public class ExamAttemptService {
                         / attempt.getAllowedTimeSeconds() * 100, 100);
 
         boolean expired  = now.isAfter(attempt.getExpiresAt());
-        boolean warning  = remaining <= 300;
-        boolean critical = remaining <= 60;
+        boolean warning  = remaining <= 300; // < 5 min
+        boolean critical = remaining <= 60;  // < 1 min
 
         return TimerStatusResponse.builder()
                 .attemptId(attempt.getId())
@@ -218,7 +225,7 @@ public class ExamAttemptService {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // SUBMIT ATTEMPT
+    // SUBMIT ATTEMPT (manual or auto)
     // ═════════════════════════════════════════════════════════════
 
     @Transactional
@@ -242,6 +249,7 @@ public class ExamAttemptService {
             throw new ValidationException(
                     "Your account is blocked.");
 
+        // ── Determine final status ────────────────────────────────
         boolean isTimedOut =
                 "TIMED_OUT".equalsIgnoreCase(req.getStatus())
                         || LocalDateTime.now().isAfter(
@@ -251,9 +259,11 @@ public class ExamAttemptService {
                 ? AttemptStatus.TIMED_OUT
                 : AttemptStatus.COMPLETED;
 
+        // ── Load questions ────────────────────────────────────────
         List<Question> questions = questionRepository
                 .findByExamIdOrderByQuestionOrder(exam.getId());
 
+        // ── Merge DB answers + request answers ────────────────────
         Map<Long, Long> finalAnswers = new HashMap<>();
 
         answerRepository.findByAttemptId(attempt.getId())
@@ -266,19 +276,20 @@ public class ExamAttemptService {
         if (req.getAnswers() != null)
             finalAnswers.putAll(req.getAnswers());
 
+        // ── Score calculation ─────────────────────────────────────
         int score = 0, correct = 0, wrong = 0, unanswered = 0;
         List<AttemptAnswer> attemptAnswers = new ArrayList<>();
         List<AttemptResultResponse.AnswerDetail> details =
                 new ArrayList<>();
 
         for (Question q : questions) {
-            Long selected = finalAnswers.get(q.getId());
+            Long    selected  = finalAnswers.get(q.getId());
             boolean isCorrect = selected != null
                     && selected.equals(q.getCorrectOptionId());
 
-            if (selected == null)  unanswered++;
-            else if (isCorrect)  { correct++; score += q.getMarks(); }
-            else                   wrong++;
+            if (selected == null)   unanswered++;
+            else if (isCorrect)   { correct++; score += q.getMarks(); }
+            else                    wrong++;
 
             String selectedText = getOptionText(q, selected);
             String correctText  = getOptionText(
@@ -291,32 +302,35 @@ public class ExamAttemptService {
                     .correct(isCorrect)
                     .build());
 
-            details.add(AttemptResultResponse.AnswerDetail.builder()
-                    .questionId(q.getId())
-                    .questionText(q.getContent())
-                    .codeSnippet(q.getCodeSnippet())
-                    .language(q.getLanguage())
-                    .selectedOptionId(selected)
-                    .selectedOptionText(selectedText)
-                    .correctOptionId(q.getCorrectOptionId())
-                    .correctOptionText(correctText)
-                    .correct(isCorrect)
-                    .marks(q.getMarks())
-                    .explanation(q.getExplanation())
-                    .build());
+            details.add(
+                    AttemptResultResponse.AnswerDetail.builder()
+                            .questionId(q.getId())
+                            .questionText(q.getContent())
+                            .codeSnippet(q.getCodeSnippet())
+                            .language(q.getLanguage())
+                            .selectedOptionId(selected)
+                            .selectedOptionText(selectedText)
+                            .correctOptionId(q.getCorrectOptionId())
+                            .correctOptionText(correctText)
+                            .correct(isCorrect)
+                            .marks(q.getMarks())
+                            .explanation(q.getExplanation())
+                            .build());
         }
 
         boolean passed = score >= exam.getPassingMarks();
-        double pct = exam.getTotalMarks() == 0 ? 0
+        double  pct    = exam.getTotalMarks() == 0 ? 0
                 : Math.round(score * 1000.0
                 / exam.getTotalMarks()) / 10.0;
 
-        LocalDateTime now = LocalDateTime.now();
+        // ── Time tracking ─────────────────────────────────────────
+        LocalDateTime now       = LocalDateTime.now();
         int timeTaken   = (int) ChronoUnit.SECONDS.between(
                 attempt.getStartedAt(), now);
         int timeAllowed = attempt.getAllowedTimeSeconds();
         int remaining   = Math.max(0, timeAllowed - timeTaken);
 
+        // ── Persist updated attempt ───────────────────────────────
         attempt.setScoreObtained(score);
         attempt.setTotalMarks(exam.getTotalMarks());
         attempt.setCorrectAnswers(correct);
@@ -332,12 +346,14 @@ public class ExamAttemptService {
         attempt.setSubmittedAt(now);
         attemptRepository.save(attempt);
 
+        // ── Clear old answers + save fresh ────────────────────────
         answerRepository.deleteByAttemptId(attempt.getId());
         answerRepository.saveAll(attemptAnswers);
 
         Double avgScore = attemptRepository
                 .avgScoreByExamId(exam.getId());
 
+        // ── Build result response ─────────────────────────────────
         AttemptResultResponse result = AttemptResultResponse.builder()
                 .attemptId(attempt.getId())
                 .examTitle(exam.getTitle())
@@ -367,16 +383,16 @@ public class ExamAttemptService {
                 .answerDetails(details)
                 .build();
 
-        // ── Real-time result to student ────────────────────────────
+        // ── Real-time result to student ───────────────────────────
         ws.convertAndSendToUser(
                 user.getEmail(),
                 "/queue/result",
                 result);
 
-        // ✅ FIX 2: HashMap instead of Map.of() — no ambiguity
+        // ── Real-time admin feed ──────────────────────────────────
         Map<String, Object> adminPayload = new HashMap<>();
-        adminPayload.put("event",      isTimedOut
-                ? "EXAM_TIMED_OUT" : "EXAM_SUBMITTED");
+        adminPayload.put("event",
+                isTimedOut ? "EXAM_TIMED_OUT" : "EXAM_SUBMITTED");
         adminPayload.put("user",       user.getName());
         adminPayload.put("email",      user.getEmail());
         adminPayload.put("exam",       exam.getTitle());
@@ -387,12 +403,14 @@ public class ExamAttemptService {
         adminPayload.put("autoSubmit", isTimedOut);
         adminPayload.put("timeTaken",
                 formatTime(attempt.getTimeTakenSeconds()));
-        ws.convertAndSend("/topic/admin/activity", adminPayload);
+        sendToAdmin(adminPayload);
 
+        // ── Send result email ─────────────────────────────────────
         emailService.sendResultEmail(user, exam, result);
         attempt.setResultEmailSent(true);
         attemptRepository.save(attempt);
 
+        // ── Send timed-out email ──────────────────────────────────
         if (isTimedOut) {
             emailService.sendTimedOutEmail(
                     user.getEmail(),
@@ -401,9 +419,10 @@ public class ExamAttemptService {
                     result);
         }
 
+        // ── In-app notification ───────────────────────────────────
         saveNotification(user, exam, passed, attempt.getId());
 
-        log.info("Attempt [{}] submitted — status=[{}] " +
+        log.info("Attempt [{}] submitted status=[{}] " +
                         "score=[{}/{}] passed=[{}] auto=[{}]",
                 attempt.getId(), finalStatus,
                 score, exam.getTotalMarks(),
@@ -467,10 +486,6 @@ public class ExamAttemptService {
                 long remaining = ChronoUnit.SECONDS.between(
                         now, attempt.getExpiresAt());
 
-                // ✅ No ambiguity — convertAndSendToUser
-                // takes (String user, String dest, Object payload)
-                // Map.of() with 3 entries is fine here
-                // because destination is fixed to user
                 Map<String, Object> warnPayload = new HashMap<>();
                 warnPayload.put("event",     "TIME_WARNING");
                 warnPayload.put("remaining", remaining);
@@ -520,7 +535,7 @@ public class ExamAttemptService {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // RESEND RESULT EMAIL
+    // RESEND RESULT EMAIL (admin trigger)
     // ═════════════════════════════════════════════════════════════
 
     @Transactional
@@ -644,8 +659,10 @@ public class ExamAttemptService {
 
     private AttemptResultResponse toDetailedResponse(
             ExamAttempt attempt) {
+
         List<AttemptAnswer> answers =
                 answerRepository.findByAttemptId(attempt.getId());
+
         List<Question> questions = questionRepository
                 .findByExamIdOrderByQuestionOrder(
                         attempt.getExam().getId());
@@ -696,9 +713,8 @@ public class ExamAttemptService {
                 .orElse(null);
     }
 
-    // ✅ FIX 3: Notification.builder() works now
-    // because @Builder is added to Notification model
-    private void saveNotification(User user, Exam exam,
+    private void saveNotification(User user,
+                                  Exam exam,
                                   boolean passed,
                                   Long attemptId) {
         String msg = passed
@@ -717,7 +733,6 @@ public class ExamAttemptService {
         long unread = notificationRepository
                 .countByUserIdAndReadFalse(user.getId());
 
-        // ✅ convertAndSendToUser — no ambiguity
         Map<String, Object> notifPayload = new HashMap<>();
         notifPayload.put("unreadCount", unread);
         notifPayload.put("latest",      msg);
@@ -726,6 +741,13 @@ public class ExamAttemptService {
                 user.getEmail(),
                 "/queue/notifications",
                 notifPayload);
+    }
+
+    // ── No ambiguity — explicit cast ──────────────────────────────
+    private void sendToAdmin(Map<String, Object> payload) {
+        ws.convertAndSend(
+                (String) "/topic/admin/activity",
+                (Object) payload);
     }
 
     private User findUserOrThrow(Long id) {

@@ -12,20 +12,26 @@ import java.util.List;
 public interface NotificationRepository
         extends JpaRepository<Notification, Long> {
 
-    // All notifications for a user newest first
+    // ── All notifications for user newest first ───────────────────
     List<Notification> findByUserIdOrderByCreatedAtDesc(
             Long userId);
 
-    // Unread notifications for a user
+    // ── Unread notifications ──────────────────────────────────────
     List<Notification> findByUserIdAndReadFalseOrderByCreatedAtDesc(
             Long userId);
 
-    // Count unread — used in UserService.getDashboard()
+    // ── Unread count ──────────────────────────────────────────────
     long countByUserIdAndReadFalse(Long userId);
 
-    // Mark all read for a user
+    // ── Mark all read for user ────────────────────────────────────
     @Modifying
     @Query("UPDATE Notification n SET n.read = true " +
             "WHERE n.user.id = :userId")
     void markAllReadForUser(Long userId);
+
+    // ── Mark single notification read ─────────────────────────────
+    @Modifying
+    @Query("UPDATE Notification n SET n.read = true " +
+            "WHERE n.id = :id")
+    void markReadById(Long id);
 }
