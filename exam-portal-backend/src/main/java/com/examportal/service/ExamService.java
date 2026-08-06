@@ -15,18 +15,19 @@ import com.examportal.repository.ExamAttemptRepository;
 import com.examportal.repository.ExamRepository;
 import com.examportal.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
+@Slf4j
+@Service
 public class ExamService {
 
-    private static final Logger log = LoggerFactory.getLogger(ExamService.class);
     private final ExamRepository examRepository;
      private final ExamAttemptRepository attemptRepository;
      private final QuestionService questionService;
@@ -345,17 +346,15 @@ public class ExamService {
          return  examRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Exam not found with id :"+ id));
      }
 
-     private  void validatePassingMarks(int passing, int total){
-
-         if (passing > total) {
-
-             throw new ValidationException("Passing marks (" + passing +" ) can't exceed" + "total marks ("+ total +").");
-             if (passing <= 0) {
-
-                 throw new ValidationException("Passing marks must be greater than 0.");
-             }
-         }
-     }
+    private void validatePassingMarks(int passing, int total) {
+        if (passing > total)
+            throw new ValidationException(
+                    "Passing marks (" + passing + ") cannot exceed " +
+                            "total marks (" + total + ").");
+        if (passing <= 0)
+            throw new ValidationException(
+                    "Passing marks must be greater than 0.");
+    }
 
      private Exam.DifficultyLevel parseDifficulty(String raw){
 
@@ -422,20 +421,19 @@ public class ExamService {
          return  mapToSummaryResponse(saved);
      }
 
-     @Transactional
-     public ExamSummaryResponse deactivateExam(Long id){
-
-         Exam exam = findOrThrow(id);
-         if (!exam.isActive()) {
-
-             throw new ValidationException("Exam is already inactive");
-             exam.setActive(false);
-             Exam saved  = examRepository.save(exam);
-             logAdminAction(ActionType.TOGGLE_EXAM, "Deactivated exam : " + saved.getTitle());
-             log.info("Exam [{}] deactivated ", saved.getTitle());
-             return  mapToSummaryResponse(saved);
-         }
-     }
+    @Transactional
+    public ExamSummaryResponse deactivateExam(Long id) {
+        Exam exam = findOrThrow(id);
+        if (!exam.isActive())
+            throw new ValidationException(
+                    "Exam is already inactive.");
+        exam.setActive(false);
+        Exam saved = examRepository.save(exam);
+        logAdminAction(ActionType.TOGGLE_EXAM,
+                "Deactivated exam: " + saved.getTitle());
+        log.info("Exam [{}] deactivated", saved.getTitle());
+        return mapToSummaryResponse(saved);
+    }
 }
 
 
